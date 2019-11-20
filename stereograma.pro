@@ -52,7 +52,8 @@ HEADERS  += mainwindow.h \
     RPly/rply.h \
     RPly/rplyfile.h \
     parse.h \
-    FormulaGen.h
+    FormulaGen.h \
+    libstereograma.h
 
 FORMS    += mainwindow.ui \
     imageviewer.ui \
@@ -67,3 +68,10 @@ RESOURCES += \
 
 OTHER_FILES += \
     old_render.txt
+
+unix:!macx: LIBS += -L$$PWD/target/release/ -lstereograma
+
+INCLUDEPATH += $$PWD/target/release
+DEPENDPATH += $$PWD/target/release
+
+unix:!macx: PRE_TARGETDEPS += $$PWD/target/release/libstereograma.a

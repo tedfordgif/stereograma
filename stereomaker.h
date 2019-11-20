@@ -4,8 +4,9 @@
 #include <QImage>
 #include <QProgressBar>
 #include "preset.h"
+#include "libstereograma.h"
 
-void scaleLine(uchar* big,const uchar *original,int sizeoriginal);
+//void scaleLine(uchar* big,const uchar *original,int sizeoriginal);
 class StereoMaker
 {
 public:

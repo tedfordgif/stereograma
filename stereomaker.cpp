@@ -14,6 +14,12 @@ StereoMaker::StereoMaker()
 void StereoMaker::composeDepth(QImage & depth,QImage & compose)
 {
     int dw=depth.width(),dh=depth.height(),cw=compose.width(),ch=compose.height();
+    cptr=compose.scanLine(0);
+    dptr=depth.scanLine(0);
+    SampleLayout dlayout = {1, 1, dw, 1, dh, dw};
+    SampleLayout clayout = {1, 1, cw, 1, ch, cw};
+    composeDepthGeneric(dptr, dw * dh, dlayout, cptr, cw * ch, clayout);
+    return;
     int x,y,cy=0;
     uchar * cptr;
     uchar * dptr;
@@ -67,7 +73,7 @@ const QVector<QRgb> & StereoMaker::getGrayScale()
     }
     return StereoMaker::grayscale;
 }
-void scaleLine(uchar* big,const uchar* original,int sizeoriginal)
+/*void scaleLine(uchar* big,const uchar* original,int sizeoriginal)
 {
     *big=*original;
     big++;
@@ -82,7 +88,7 @@ void scaleLine(uchar* big,const uchar* original,int sizeoriginal)
         big++;
     }
     *big=*original;
-}
+}*/
 
 QImage StereoMaker::render(const QImage & map,const QImage & ptrn,Preset *psettings,QProgressBar * qpbar,const QImage * eye_helper_right,const QImage * eye_helper_left,bool show_helper)
 {
@@ -110,8 +116,7 @@ QImage StereoMaker::render(const QImage & map,const QImage & ptrn,Preset *psetti
 
     int maxdepth=dpi*psettings->getMaximumDepth();
     int vmaxsep=(int)(((long)oversam*eyeSep*maxdepth*2)/(maxdepth+obsDist));
-    int maxsep=vmaxsep/(oversam*2); // pattern must be at
-                                                                  // least this wide
+    int maxsep=vmaxsep/(oversam*2); // pattern must be at least this wide
 
 
     QImage pattern=ptrn.scaled(vmaxsep/oversam+1,(ptrn.height()*(maxsep+1))/ptrn.width(),Qt::IgnoreAspectRatio,Qt::SmoothTransformation);
