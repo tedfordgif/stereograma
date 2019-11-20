@@ -13,10 +13,10 @@ pub extern "C" fn composeDepthGeneric(
     compose: &u8, compose_width: usize, compose_height: usize
 ) -> bool
 {
-    let mut depth = unsafe { slice::from_raw_parts(depth, (depth_width * depth_height) as usize) };
+    let mut depth = unsafe { slice::from_raw_parts_mut(depth, (depth_width * depth_height) as usize) };
     let compose = unsafe { slice::from_raw_parts(compose, (compose_width * compose_height) as usize) };
 
-    let mut depth = match ImageBuffer::<Luma<u8>, &[u8]>::from_raw(depth_width as u32, depth_height as u32, depth) {
+    let mut depth = match ImageBuffer::<Luma<u8>, &mut [u8]>::from_raw(depth_width as u32, depth_height as u32, depth) {
         None => return false, // Invalid size.
         Some(buf) => buf,
     };
