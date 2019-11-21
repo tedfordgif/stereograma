@@ -14,15 +14,13 @@ StereoMaker::StereoMaker()
 void StereoMaker::composeDepth(QImage & depth,QImage & compose)
 {
     int dw=depth.width(),dh=depth.height(),cw=compose.width(),ch=compose.height();
-    cptr=compose.scanLine(0);
-    dptr=depth.scanLine(0);
-    SampleLayout dlayout = {1, 1, dw, 1, dh, dw};
-    SampleLayout clayout = {1, 1, cw, 1, ch, cw};
-    composeDepthGeneric(dptr, dw * dh, dlayout, cptr, cw * ch, clayout);
-    return;
-    int x,y,cy=0;
     uchar * cptr;
     uchar * dptr;
+    cptr=compose.scanLine(0);
+    dptr=depth.scanLine(0);
+    composeDepthGeneric(dptr, dw, dh, cptr, cw, ch);
+    return;
+    int x,y,cy=0;
     uchar * dchunk;
     uchar * dchunkend;
     uchar * ccptr;
