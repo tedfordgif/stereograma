@@ -31,8 +31,7 @@ SOURCES += main.cpp\
     stringtype.cpp \
     trirender.cpp \
     RPly/rply.c \
-    parse.cpp \
-    FormulaGen.cpp
+    parse.cpp
 
 HEADERS  += mainwindow.h \
     imagecontainerwidget.h \
@@ -52,7 +51,6 @@ HEADERS  += mainwindow.h \
     RPly/rply.h \
     RPly/rplyfile.h \
     parse.h \
-    FormulaGen.h \
     libstereograma.h
 
 FORMS    += mainwindow.ui \
@@ -60,8 +58,7 @@ FORMS    += mainwindow.ui \
     modeldepthviewer.ui \
     presetedit.ui \
     anaglyphmaker.ui \
-    stringtype.ui \
-    FormulaGen.ui
+    stringtype.ui
 
 RESOURCES += \
     rsc.qrc

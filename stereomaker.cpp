@@ -16,48 +16,10 @@ void StereoMaker::composeDepth(QImage & depth,QImage & compose)
     int dw=depth.width(),dh=depth.height(),cw=compose.width(),ch=compose.height();
     uchar * cptr;
     uchar * dptr;
+
     cptr=compose.scanLine(0);
     dptr=depth.scanLine(0);
     composeDepthGeneric(dptr, dw, dh, cptr, cw, ch);
-    return;
-    int x,y,cy=0;
-    uchar * dchunk;
-    uchar * dchunkend;
-    uchar * ccptr;
-    for(y=0;y<dh;y++)
-    {
-        cptr=compose.scanLine(cy);
-        dptr=depth.scanLine(y);
-        for(x=cw;x<=dw;x+=cw)
-        {
-            ccptr=cptr;
-            dchunk=dptr+x-cw;
-            dchunkend=dptr+x;
-            while(dchunk < dchunkend)
-            {
-                if (*ccptr > *dchunk)
-                    *dchunk=*ccptr;
-                dchunk++;
-                ccptr++;
-            }
-        }
-        if (x<dw)
-        {
-            ccptr=cptr;
-            dchunk=dptr+x;
-            dchunkend=dptr+dw;
-            while(dchunk < dchunkend)
-            {
-                if (*ccptr > *dchunk)
-                    *dchunk=*ccptr;
-                dchunk++;
-                ccptr++;
-            }
-        }
-        cy++;
-        if (cy==ch)
-            cy=0;
-    }
 
 }
 
@@ -71,22 +33,6 @@ const QVector<QRgb> & StereoMaker::getGrayScale()
     }
     return StereoMaker::grayscale;
 }
-/*void scaleLine(uchar* big,const uchar* original,int sizeoriginal)
-{
-    *big=*original;
-    big++;
-    sizeoriginal--;
-    while(sizeoriginal>0)
-    {
-        sizeoriginal--;
-        *big=((*original)*3+(*(original+1)))/4;
-        big++;
-        *big=((*original)+3*(*(original+1)))/4;
-        original++;
-        big++;
-    }
-    *big=*original;
-}*/
 
 QImage StereoMaker::render(const QImage & map,const QImage & ptrn,Preset *psettings,QProgressBar * qpbar,const QImage * eye_helper_right,const QImage * eye_helper_left,bool show_helper)
 {

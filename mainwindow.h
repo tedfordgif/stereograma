@@ -45,7 +45,7 @@ private slots:
 
     void on_actionRemove_preset_triggered();
 
-	void on_actionGenerate_Depth_Map_triggered();
+    //void on_actionGenerate_Depth_Map_triggered();
 	
 private:
     void loadPresets();
