@@ -16,12 +16,12 @@ pub extern "C" fn composeDepthGeneric(
     let mut depth = unsafe { slice::from_raw_parts_mut(depth, (depth_width * depth_height) as usize) };
     let compose = unsafe { slice::from_raw_parts(compose, (compose_width * compose_height) as usize) };
 
-    let mut depth = match ImageBuffer::<Luma<u8>, &mut [u8]>::from_raw(depth_width as u32, depth_height as u32, depth) {
+    let mut depth = match ImageBuffer::from_raw(depth_width as u32, depth_height as u32, depth) {
         None => return false, // Invalid size.
         Some(buf) => buf,
     };
 
-    let compose = match ImageBuffer::<Luma<u8>, &[u8]>::from_raw(compose_width as u32, compose_height as u32, compose) {
+    let compose = match ImageBuffer::from_raw(compose_width as u32, compose_height as u32, compose) {
         None => return false, // Invalid size.
         Some(buf) => buf,
     };
@@ -31,9 +31,9 @@ pub extern "C" fn composeDepthGeneric(
     let zipped_rows = depth_rows.zip(compose_rows);
 
     for (depth_row, compose_row) in zipped_rows {
-        for (depth_val, compose_val) in depth_row.zip(compose_row.cycle) {
-            if compose_val > depth_val {
-                depth_val = compose_val;
+        for (depth_val, compose_val) in depth_row.zip(compose_row.cycle()) {
+            if *compose_val > *depth_val {
+                *depth_val = *compose_val;
             }
         }
     }
