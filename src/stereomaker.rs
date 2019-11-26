@@ -2,48 +2,50 @@ extern crate libc;
 use std::slice;
 use std::convert::TryInto;
 use image::imageops::resize;
-use image::ImageBuffer;
+use image::{ImageBuffer, RgbaImage};
 use image::FilterType::Triangle;
 //use std::ptr;
 
 #[no_mangle]
-pub extern "C" fn renderFromMap() -> GenericImage
+pub extern "C" fn renderFromMap() -> &[u8]
 {
 
 }
 
-pub fn render(map: &mut [u8], max_depth: u32, min_depth: u32,
-              pattern: &ImageBuffer,
-              dpi: u32, observer_distance: u32, eye_separation: u32) -> GenericImage
+pub fn render(map: &[u8], map_width: u32, map_height: u32, max_depth: u32, min_depth: u32,
+              pattern: &RgbaImage,
+              dpi: u32, observer_distance: u32, eye_separation: u32) -> RgbaImage
 {
+    assert!(map.length == map_width * map_height);
+
     // Oversampling is 6, but against a line scaled to double width.
     let oversam = 6u8;
-    let vwidth : usize = oversam*map_width*2;
+    let vwidth : u32 = oversam*map_width*2;
 
-    let map_width = map.width();
-    let map_height = map.height();
-
-    let mut lookL = vec![0usize; vwidth];
-    let mut lookR = vec![0usize; vwidth];
+    let mut lookL = vec![0u32; vwidth];
+    let mut lookR = vec![0u32; vwidth];
 
     let yShift = dpi/16;
     let veyeSep=eye_separation*oversam*2;
 
     // Use similar triangles to calculate max/min separation of matching pixels on virtual screen.
-    let vmax_sep=((oversam*eye_separation*max_depth*2)/(max_depth+observer_distance));
-    let vmin_sep=((2*oversam*eye_separation*min_depth)/(min_depth+observer_distance));
-    // Pattern must be at least this wide
+    let vmax_sep=(oversam*eye_separation*max_depth*2)/(max_depth+observer_distance);
+    let vmin_sep=(2*oversam*eye_separation*min_depth)/(min_depth+observer_distance);
+    // Pattern must be at least this wide, as must the source image.
     let max_sep=vmax_sep/(oversam*2);
     let pattern_width = pattern.width();
     assert!(pattern_width > max_sep);
+    assert!(map_width > max_sep);
 
     let max_height = max_depth - min_depth;
 
     // Scale pattern image to repeat horizontally at separation distance without oversampling
     // and vertically without oversampling and factor of 2.
     let pattern=resize(pattern, vmax_sep/oversam+1,(pattern.height()*(max_sep+1))/pattern.width(), Triangle);
-    // TODO: assert!(pattern.depth == 32);
     let pattern_height=pattern.height();
+    // Create lookup table for pattern rows.
+    let pattern_rows = pattern.rows().map(|r| { r.collect() }).collect();
+
     let mut result : RgbaImage = ImageBuffer::new(map_width, map_height);
     let mut vCurResultLine : RgbaImage = ImageBuffer::new(vwidth, 1);
 
@@ -55,19 +57,17 @@ pub fn render(map: &mut [u8], max_depth: u32, min_depth: u32,
 
     let sep=0u32;
 
-    // Create lookup table for pattern rows.
-    let rows = pattern.rows().map(|r| { r.collect() }).collect();
-
     // TODO: Create lookup table for virtual separation distance by depth.
     let depthsep = (0..256).map(|depth_index| {
         let featureZ = max_depth-depth_index*max_height/256;
         ((veyeSep*featureZ)/(featureZ+observer_distance))
     }).collect();
 
-    uchar * mapptr=(uchar *)malloc(map.width()*2);
-    for (y=0;y<map_height;y++) {
+    let mut doubled_map_line = vec![0u8; map_width*2];
+
+    for y in 0..map_height {
         // TODO: initialize look[LR] to 0.
-        for (x=0; x<vwidth; x++) {
+        for x in 0..vwidth {
             lookL[x]=x;
             lookR[x]=x;
         }
@@ -79,40 +79,121 @@ pub fn render(map: &mut [u8], max_depth: u32, min_depth: u32,
         // will also *always* create smooth, averaged edges, whereas a larger map
         // could still have large jumps. This function should maybe be called
         // "scaleAndSmoothLine".
-        scaleLine(mapptr,map.scanLine(y),map_width);
+        scale_line(doubled_map_line, map.scanLine(y));
 
         // Link lookL and lookR arrays
         // TODO: Can we shorten some iterations due to oversampling?
         // Maybe, might have something to do with ratio of oversampling to sep
         // x is virtual index, (column and oversampling)
-        for (x=0; x<vwidth; x++) {
-            if (x%oversam==0) {
+        for x in (vmin_sep/2)..(vmax_sep/2) {
+            if x%oversam==0 {
                 // Reset sep to start oversampling again.
-                sep=depthsep[mapptr[x/oversam]];
+                sep=depthsep[doubled_map_line[x/oversam]];
             }
 
-            left=x-sep/2; right=left+sep;
-            if ((left>=0) && (right<vwidth)) {
-                visual=true;
+            let left=x-sep/2;
+            let right=left+sep;
+            if left>=0 {
+                let visual=true;
                 // The lookL and lookR if clauses aren't independent, 
                 // especially because of oversampling.
-                if (lookL[right]!=right) {
+                if lookL[right]!=right {
                     // Right pt already linked.
-                    if (lookL[right]<left) {
+                    if lookL[right]<left {
                         // Deeper than current, so break old links.
                         lookR[lookL[right]]=lookL[right];
                         lookL[right]=right;
                     }
-                    else visual=false;
+                    else {
+                        visual=false;
+                    }
                 }
-                if (lookR[left]!=left) {
-                    if (lookR[left]>right) {
+                if lookR[left]!=left {
+                    if lookR[left]>right {
                         lookL[lookR[left]]=lookR[left];
                         lookR[left]=left;
                     }
-                    else visual=false;
+                    else {
+                        visual=false;
+                    }
                 }
-                if (visual) {
+                if visual {
+                    // Link both sides.
+                    lookL[right]=left;
+                    lookR[left]=right;
+                }
+            }
+        }
+        for x in (vmax_sep/2)..(vwidth-vmax_sep/2) {
+            if x%oversam==0 {
+                // Reset sep to start oversampling again.
+                sep=depthsep[doubled_map_line[x/oversam]];
+            }
+
+            let left=x-sep/2;
+            let right=left+sep;
+            let visual=true;
+            // The lookL and lookR if clauses aren't independent, 
+            // especially because of oversampling.
+            if lookL[right]!=right {
+                // Right pt already linked.
+                if lookL[right]<left {
+                    // Deeper than current, so break old links.
+                    lookR[lookL[right]]=lookL[right];
+                    lookL[right]=right;
+                }
+                else {
+                    visual=false;
+                }
+            }
+            if lookR[left]!=left {
+                if lookR[left]>right {
+                    lookL[lookR[left]]=lookR[left];
+                    lookR[left]=left;
+                }
+                else {
+                    visual=false;
+                }
+            }
+            if visual {
+                // Link both sides.
+                lookL[right]=left;
+                lookR[left]=right;
+            }
+        }
+        for x in (vwidth-vmax_sep/2)..(vwidth-vmin_sep/2) {
+            if x%oversam==0 {
+                // Reset sep to start oversampling again.
+                sep=depthsep[doubled_map_line[x/oversam]];
+            }
+
+            let left=x-sep/2;
+            let right=left+sep;
+            if right<vwidth {
+                let visual=true;
+                // The lookL and lookR if clauses aren't independent, 
+                // especially because of oversampling.
+                if lookL[right]!=right {
+                    // Right pt already linked.
+                    if lookL[right]<left {
+                        // Deeper than current, so break old links.
+                        lookR[lookL[right]]=lookL[right];
+                        lookL[right]=right;
+                    }
+                    else {
+                        visual=false;
+                    }
+                }
+                if lookR[left]!=left {
+                    if lookR[left]>right {
+                        lookL[lookR[left]]=lookR[left];
+                        lookR[left]=left;
+                    }
+                    else {
+                        visual=false;
+                    }
+                }
+                if visual {
                     // Link both sides.
                     lookL[right]=left;
                     lookR[left]=right;
@@ -120,73 +201,72 @@ pub fn render(map: &mut [u8], max_depth: u32, min_depth: u32,
             }
         }
 
-
-        lineptr=(uint*)vCurResultLine.scanLine(0);
-
         // Fill first vmin_sep pixels with pattern, starting with s.
-        // TODO: convert to std::copy-like in Rust.
-        dataptr=lineptr+s;
-        for (x=s; x<vwidth && x<s+vmin_sep; x++, dataptr++) {
+        // IDEA: Use iterators instead of set_pixel
+        for x in s..(s+vmin_sep) {
             // Get color from pattern.
-            *dataptr=patternptr[(y+((x-s)/vmax_sep)*yShift+pattern_height) % pattern_height][((x+pattern_offset) % vmax_sep)/oversam];
+            vCurResultLine.set_pixel(x, 0, pattern_rows[(y+((x-s)/vmax_sep)*yShift+pattern_height) % pattern_height][((x+pattern_offset) % vmax_sep)/oversam]);
         }
 
         // Fill center (s+vmin_sep to s+vmax_sep) of line.
-        lastlinked=-10; // dummy initial value
-        for (; x<vwidth && x<s+vmax_sep; x++, dataptr++) {
-            if ((lookL[x]==x) || (lookL[x]<s)) {
+        let mut lastlinked : u32 =0; // dummy initial value
+        for x in (s+vmin_sep)..(s+vmax_sep) {
+            if (lookL[x]==x) || (lookL[x]<s) {
                 // Not linked or linked to something in the left side of the image.
-                if (lastlinked==(x-1))
+                if lastlinked==(x-1) {
                     // Use adjacent color to reduce "twinkling" (retinal rivalry).
-                    *dataptr=*(dataptr-1);
+                    vCurResultLine.set_pixel(x, 0, vCurResultLine.get_pixel(x-1, 0));
+                }
                 else {
                     // Get "new" color from previous row (yShift).
-                    *dataptr=patternptr[(y+((x-s)/vmax_sep)*yShift+pattern_height) % pattern_height][((x+pattern_offset) % vmax_sep)/oversam];
+                    vCurResultLine.set_pixel(x, 0, pattern_rows[(y+((x-s)/vmax_sep)*yShift+pattern_height) % pattern_height][((x+pattern_offset) % vmax_sep)/oversam]);
                 }
             }
             else {
                 // Linked to a value we know, so use that.
-                *dataptr=*(lineptr+lookL[x]);
+                vCurResultLine.set_pixel(x, 0, vCurResultLine.get_pixel(lookL[x], 0));
                 // Keep track of the last pixel to be constrained.
                 lastlinked=x; 
             }
         }
 
         // Fill right half of line.
-        for (; x<vwidth; x++, dataptr++) {
-            if ((lookL[x]==x)) {
-                if (lastlinked==(x-1))
-                    *dataptr=*(dataptr-1);
+        for x in (s+vmax_sep)..vwidth {
+            if lookL[x]==x {
+                if lastlinked==(x-1) {
+                    vCurResultLine.set_pixel(x, 0, vCurResultLine.get_pixel(x-1, 0));
+                }
                 else {
-                    *dataptr=patternptr[(y+((x-s)/vmax_sep)*yShift+pattern_height) % pattern_height][((x+pattern_offset) % vmax_sep)/oversam];
+                    vCurResultLine.set_pixel(x, 0, pattern_rows[(y+((x-s)/vmax_sep)*yShift+pattern_height) % pattern_height][((x+pattern_offset) % vmax_sep)/oversam]);
                 }
             }
             else {
-                *dataptr=*(lineptr+lookL[x]);
+                vCurResultLine.set_pixel(x, 0, vCurResultLine.get_pixel(lookL[x], 0));
                 lastlinked=x; 
             }
         }
 
         // Fill left half of line.
         // Opposite of right side, except we can use pixels from right side.
-        dataptr=lineptr+s-1;
-        lastlinked=-10;
-        for (x=s-1; x>=0; x--, dataptr--) {
-            if (lookR[x]==x) {
-                if (lastlinked==(x+1))
-                    *dataptr=*(dataptr+1);
+        lastlinked=vwidth;
+        for x in (0..s).rev() {
+            if lookR[x]==x {
+                if lastlinked==(x+1) {
+                    vCurResultLine.set_pixel(x, 0, vCurResultLine.get_pixel(x+1, 0));
+                }
                 else {
-                    *dataptr=patternptr[(y+((s-x)/vmax_sep+1)*yShift+pattern_height) % pattern_height][((x+pattern_offset) % vmax_sep)/oversam];
+                    vCurResultLine.set_pixel(x, 0, pattern_rows[(y+((s-x)/vmax_sep+1)*yShift+pattern_height) % pattern_height][((x+pattern_offset) % vmax_sep)/oversam]);
                 }
             }
             else {
-                *dataptr=*(lineptr+lookR[x]);
+                vCurResultLine.set_pixel(x, 0, vCurResultLine.get_pixel(lookR[x], 0));
                 lastlinked=x;
             }
         }
 
         // Downsample to original width.
-        CurResultScaledLine = vCurResultLine.scaledToWidth(map_width,Qt::SmoothTransformation);
+        CurResultScaledLine = resize(vCurResultLine, map_width, 1, Triangle);
+
         // Copy line into result.
         memcpy(result.scanLine(y),CurResultScaledLine.scanLine(0),result.bytesPerLine());
     }
