@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Ted A. Gifford <tedfordgif@gmail.com>"]
 
 [dependencies]
+arr_macro = "*"
 image = "^0.22"
 libc = "^0.2.0"
 ply-rs = "^0.1.1"
