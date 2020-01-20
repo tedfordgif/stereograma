@@ -7,11 +7,28 @@ use std::convert::TryInto;
 use std::slice;
 //use std::ptr;
 
-/*#[no_mangle]
-pub extern "C" fn renderFromMap() -> &[u8]
+#[no_mangle]
+pub extern "C" fn renderFromMap(
+    map: &u8,
+    map_width: u32,
+    map_height: u32,
+    max_depth: u32,
+    min_depth: u32,
+    pattern: &u8,
+    pattern_width: u32,
+    pattern_height: u32,
+    result: &mut u8,
+    dpi: u32,
+    observer_distance: u32,
+    eye_separation: u32
+    )
 {
+    let map = unsafe { slice::from_raw_parts(map, (map_width * map_height) as usize) };
+    let pattern = RgbaImage::from_raw(pattern_width, pattern_height, unsafe { slice::from_raw_parts(pattern, (pattern_width * pattern_height * 4) as usize) }.to_vec()).unwrap();
+    let mut result = RgbaImage::from_raw(map_width, map_height, unsafe { slice::from_raw_parts_mut(result, (map_width * map_height * 4) as usize) }.to_vec()).unwrap();
 
-}*/
+    render(map, map_width, map_height, max_depth, min_depth, &pattern, &mut result, dpi, observer_distance, eye_separation);
+}
 
 pub fn render(
     map: &[u8],
@@ -20,11 +37,13 @@ pub fn render(
     max_depth: u32,
     min_depth: u32,
     pattern: &RgbaImage,
+    result: &mut RgbaImage,
     dpi: u32,
     observer_distance: u32,
     eye_separation: u32,
-) -> RgbaImage {
+) {
     assert!(map.len() == (map_width * map_height) as usize);
+    assert!(map_width == result.width() && map_height == result.height());
 
     // Oversampling is 6, but against a line scaled to double width.
     let oversam = 6;
@@ -59,7 +78,6 @@ pub fn render(
     // Create lookup table for pattern rows.
     let pattern_rows: Vec<Vec<&Rgba<u8>>> = pattern.rows().map(|r| r.collect()).collect();
 
-    let mut result: RgbaImage = ImageBuffer::new(map_width, map_height);
     let mut v_curr_result_line: RgbaImage = ImageBuffer::new(vwidth, 1);
 
     // s is start
@@ -273,7 +291,6 @@ pub fn render(
             *result_p = *cur_p;
         }
     }
-    result
 }
 
 #[no_mangle]

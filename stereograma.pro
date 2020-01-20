@@ -71,4 +71,4 @@ unix:!macx: LIBS += -L$$PWD/target/release/ -lstereograma
 INCLUDEPATH += $$PWD/target/release
 DEPENDPATH += $$PWD/target/release
 
-unix:!macx: PRE_TARGETDEPS += $$PWD/target/release/libstereograma.a
+unix:!macx: PRE_TARGETDEPS += $$PWD/target/release/libstereograma.so
