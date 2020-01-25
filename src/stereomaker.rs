@@ -2,7 +2,7 @@ extern crate libc;
 use arr_macro::arr;
 use image::imageops::resize;
 use image::FilterType::Triangle;
-use image::{ImageBuffer, Rgba, RgbaImage};
+use image::{open, ImageBuffer, Rgba, RgbaImage};
 use std::convert::TryInto;
 use std::slice;
 //use std::ptr;
@@ -42,7 +42,7 @@ pub fn render(
     observer_distance: u32,
     eye_separation: u32,
 ) {
-    assert!(map.len() == (map_width * map_height) as usize);
+    assert!(map.len() == (map_width * map_height) as usize, "Map len != width*height | {:?} == {:?} * {:?}", map.len(), map_width, map_height);
     assert!(map_width == result.width() && map_height == result.height());
 
     // Oversampling is 6, but against a line scaled to double width.
@@ -61,7 +61,7 @@ pub fn render(
     // Pattern must be at least this wide, as must the source image.
     let max_sep = vmax_sep / (oversam * 2);
     let pattern_width = pattern.width();
-    assert!(pattern_width > max_sep);
+    assert!(pattern_width > max_sep, "pattern_width > max_sep | {:?} > {:?}", pattern_width, max_sep);
     assert!(map_width > max_sep);
 
     let max_height = max_depth - min_depth;
@@ -386,5 +386,20 @@ mod tests {
             "{:?}",
             d
         );
+    }
+
+    #[test]
+    fn test_render() {
+        // production/depthmaps/dolphins.png
+        let (depth_map, mut result) = {
+            let depth_map1 = open("production/depthmaps/dolphins.png").unwrap();
+            let depth_map2 = depth_map1.to_luma();
+            let result: RgbaImage = ImageBuffer::new(depth_map2.width(), depth_map2.height());
+            (depth_map2.into_vec(), result)
+        };
+        let pattern = open("production/textures/tx_021.jpg").unwrap();
+        let pattern = pattern.to_rgba();
+        render(&depth_map, result.width(), result.height(), 2000u32, 1500u32, &pattern, &mut result, 100u32, 4000u32, 500u32);
+        result.save("test_out.png").unwrap();
     }
 }
