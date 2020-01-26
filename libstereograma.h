@@ -26,7 +26,7 @@ void renderFromMap(
     const uint8_t *pattern,
     uint32_t pattern_width,
     uint32_t pattern_height,
-    const uint8_t *result,
+    uint8_t *result,
     uint32_t dpi,
     uint32_t observer_distance,
     uint32_t eye_separation

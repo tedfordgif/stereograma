@@ -60,7 +60,7 @@ QImage StereoMaker::render(const QImage & map,const QImage & ptrn,Preset *psetti
     //QImage pattern=ptrn.scaled(vmaxsep/oversam+1,(ptrn.height()*(maxsep+1))/ptrn.width(),Qt::IgnoreAspectRatio,Qt::SmoothTransformation);
     QImage pattern=ptrn.convertToFormat(QImage::Format_RGBA8888);
     QImage result(map.width(), map.height(), pattern.format());
-    renderFromMap(map.scanLine(0), width, height, max_depth, dpi * psettings->getMinimumDepth(), pattern.scanLine(0), pattern.width(), pattern.height(), result.scanLine(0), dpi, observer_distance, eye_separation);
+    renderFromMap(map.scanLine(0), width, height, max_depth, (int)(dpi * psettings->getMinimumDepth()), pattern.scanLine(0), pattern.width(), pattern.height(), result.scanLine(0), dpi, observer_distance, eye_separation);
 //        if (progbarval!=10*y/(height-1))
 //        {
 //            progbarval=10*y/(height-1);

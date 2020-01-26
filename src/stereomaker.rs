@@ -2,9 +2,10 @@ extern crate libc;
 use arr_macro::arr;
 use image::imageops::resize;
 use image::FilterType::Triangle;
-use image::{open, ImageBuffer, Rgba, RgbaImage};
+use image::{ImageBuffer, Rgba, RgbaImage};
 use std::convert::TryInto;
 use std::slice;
+use std::vec::Vec;
 //use std::ptr;
 
 #[no_mangle]
@@ -14,7 +15,7 @@ pub extern "C" fn renderFromMap(
     map_height: u32,
     max_depth: u32,
     min_depth: u32,
-    pattern: &u8,
+    pattern: &mut u8,
     pattern_width: u32,
     pattern_height: u32,
     result: &mut u8,
@@ -24,10 +25,15 @@ pub extern "C" fn renderFromMap(
     )
 {
     let map = unsafe { slice::from_raw_parts(map, (map_width * map_height) as usize) };
-    let pattern = RgbaImage::from_raw(pattern_width, pattern_height, unsafe { slice::from_raw_parts(pattern, (pattern_width * pattern_height * 4) as usize) }.to_vec()).unwrap();
-    let mut result = RgbaImage::from_raw(map_width, map_height, unsafe { slice::from_raw_parts_mut(result, (map_width * map_height * 4) as usize) }.to_vec()).unwrap();
+    let pattern_byte_length = (pattern_width * pattern_height * 4) as usize;
+    let pattern = RgbaImage::from_raw(pattern_width, pattern_height, unsafe { Vec::from_raw_parts(pattern, pattern_byte_length, pattern_byte_length) }).unwrap();
+    let result_byte_length = (map_width * map_height * 4) as usize;
+    let mut result = RgbaImage::from_raw(map_width, map_height, unsafe { Vec::from_raw_parts(result, result_byte_length, result_byte_length) }).unwrap();
 
     render(map, map_width, map_height, max_depth, min_depth, &pattern, &mut result, dpi, observer_distance, eye_separation);
+    
+    std::mem::forget(pattern);
+    std::mem::forget(result);
 }
 
 pub fn render(
@@ -348,6 +354,7 @@ fn scale_line(big: &mut [u8], original: &[u8]) {
 
 #[cfg(test)]
 mod tests {
+    use image::open;
     use super::*;
 
     #[test]
